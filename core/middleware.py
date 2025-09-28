@@ -7,7 +7,7 @@ rate limiting, and security headers.
 
 from typing import Callable, Dict, Any
 from fastapi import Request, Response
-from fastapi.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 import time
 import logging
 

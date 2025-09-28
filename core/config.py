@@ -6,7 +6,8 @@ and environment variable support.
 """
 
 from typing import Optional, List, Dict, Any
-from pydantic import BaseSettings, Field, validator
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings
 import os
 
 
@@ -167,21 +168,21 @@ class BMAuthConfig(BaseSettings):
         description="How long to keep old partitions in days"
     )
 
-    @validator("secret_key")
+    @field_validator("secret_key")
     def validate_secret_key(cls, v):
         if v == "change-this-in-production":
             if os.getenv("BMAUTH_ENV", "development") == "production":
                 raise ValueError("Secret key must be changed in production")
         return v
 
-    @validator("dashboard_password")
+    @field_validator("dashboard_password")
     def validate_dashboard_password(cls, v):
         if v == "change-this-password":
             if os.getenv("BMAUTH_ENV", "development") == "production":
                 raise ValueError("Dashboard password must be changed in production")
         return v
 
-    @validator("rp_origins")
+    @field_validator("rp_origins")
     def validate_origins(cls, v):
         if not v:
             raise ValueError("At least one origin must be specified")
