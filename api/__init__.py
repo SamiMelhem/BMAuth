@@ -1,1 +1,0 @@
-"""API package for the biometric authentication system."""
