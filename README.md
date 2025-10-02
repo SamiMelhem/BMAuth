@@ -3,6 +3,32 @@ Biometric Authentication System for FastAPI applications, providing the most sec
 
 This system leverages WebAuthn/FIDO2 Principles in building lots of secure layers, while being a smooth experience for users.
 
+## Installation
+
+Install BMAuth directly from PyPI:
+
+```bash
+pip install bmauth
+```
+
+## Quick Start
+
+```python
+from fastapi import FastAPI
+from bmauth import BMAuth
+
+app = FastAPI()
+
+# Initialize BMAuth
+auth = BMAuth(
+    app=app,
+    email_api_key="your-sendgrid-api-key",
+    from_email="noreply@yourdomain.com"
+)
+
+# Your app now has biometric authentication endpoints!
+```
+
 ## Registering
 - User types in email (identifier in the server)
 - User provides biometric (establishes device's private key) and sends public key to the server
