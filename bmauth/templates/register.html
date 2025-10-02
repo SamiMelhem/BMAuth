@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - BMAuth</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            width: 90%;
+            max-width: 400px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #555;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .message {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border-radius: 5px;
+            display: none;
+        }
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .link {
+            text-align: center;
+            margin-top: 1rem;
+        }
+        .link a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Register</h1>
+        <form id="registerForm">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <button type="submit">Register with Biometrics</button>
+        </form>
+        <div id="message" class="message"></div>
+        <div class="link">
+            <a href="/auth/login">Already registered? Login</a>
+        </div>
+    </div>
+
+    <script>
+        // Helper to convert base64url to Uint8Array
+        function base64urlToUint8Array(base64url) {
+            const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes;
+        }
+
+        // Helper to convert Uint8Array to base64url
+        function uint8ArrayToBase64url(array) {
+            const binary = String.fromCharCode(...array);
+            const base64 = btoa(binary);
+            return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const messageDiv = document.getElementById('message');
+
+            try {
+                // Step 1: Request challenge from server
+                const beginResponse = await fetch('/auth/register/begin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+
+                if (!beginResponse.ok) throw new Error('Failed to begin registration');
+                const options = await beginResponse.json();
+
+                // Convert base64 strings to Uint8Array for WebAuthn
+                options.challenge = base64urlToUint8Array(options.challenge);
+                options.user.id = base64urlToUint8Array(options.user.id);
+
+                // Step 2: Create credential with biometrics
+                const credential = await navigator.credentials.create({
+                    publicKey: options
+                });
+
+                // Step 3: Send credential to server
+                const credentialData = {
+                    email,
+                    credential: {
+                        id: credential.id,
+                        rawId: uint8ArrayToBase64url(new Uint8Array(credential.rawId)),
+                        response: {
+                            clientDataJSON: uint8ArrayToBase64url(new Uint8Array(credential.response.clientDataJSON)),
+                            attestationObject: uint8ArrayToBase64url(new Uint8Array(credential.response.attestationObject))
+                        },
+                        type: credential.type
+                    }
+                };
+
+                const completeResponse = await fetch('/auth/register/complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(credentialData)
+                });
+
+                if (!completeResponse.ok) throw new Error('Failed to complete registration');
+
+                messageDiv.style.display = 'block';
+                messageDiv.className = 'message success';
+                messageDiv.textContent = `✅ Registration successful for ${email}!`;
+
+            } catch (error) {
+                messageDiv.style.display = 'block';
+                messageDiv.className = 'message error';
+                messageDiv.textContent = `❌ Registration failed: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html>
