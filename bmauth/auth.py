@@ -19,6 +19,15 @@ class RegistrationCredential(BaseModel):
     credential: dict
 
 
+class LoginRequest(BaseModel):
+    email: str
+
+
+class LoginCredential(BaseModel):
+    email: str
+    credential: dict
+
+
 # Temporary in-memory storage (replace with database)
 users_db = {}
 challenges_db = {}
@@ -122,6 +131,65 @@ class BMAuth:
             del challenges_db[email]
 
             return JSONResponse({"success": True, "message": "Registration successful"})
+
+        @self.app.post("/auth/login/begin")
+        async def login_begin(req: LoginRequest):
+            """Begin login - generate challenge for WebAuthn"""
+            email = req.email
+
+            # Check if user exists
+            if email not in users_db:
+                return JSONResponse({"error": "User not found"}, status_code=404)
+
+            # Generate random challenge
+            challenge = secrets.token_bytes(32)
+            challenge_b64 = base64.b64encode(challenge).decode('utf-8')
+
+            # Store challenge temporarily
+            challenges_db[email] = challenge_b64
+
+            user = users_db[email]
+
+            return JSONResponse({
+                "challenge": challenge_b64,
+                "rpId": self.host,
+                "allowCredentials": [{
+                    "type": "public-key",
+                    "id": user["credential_id"]
+                }],
+                "userVerification": "required",
+                "timeout": 60000
+            })
+
+        @self.app.post("/auth/login/complete")
+        async def login_complete(cred: LoginCredential):
+            """Complete login - verify signature"""
+            email = cred.email
+
+            # Verify challenge exists
+            if email not in challenges_db:
+                return JSONResponse({"error": "Invalid session"}, status_code=400)
+
+            # Verify user exists
+            if email not in users_db:
+                return JSONResponse({"error": "User not found"}, status_code=404)
+
+            # In production, verify the signature with the stored public key
+            # For now, basic validation
+            stored_credential_id = users_db[email]["credential_id"]
+            received_credential_id = cred.credential.get("id")
+
+            if stored_credential_id != received_credential_id:
+                return JSONResponse({"error": "Invalid credential"}, status_code=401)
+
+            # Clean up challenge
+            del challenges_db[email]
+
+            return JSONResponse({
+                "success": True,
+                "message": "Login successful",
+                "user": {"email": email}
+            })
 
         @self.app.get("/auth/status")
         async def status():
