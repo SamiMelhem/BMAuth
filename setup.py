@@ -32,6 +32,9 @@ setup(
         "pydantic>=1.8.0",
         "cryptography>=3.4.0",
         "python-multipart>=0.0.5",
+        "httpx>=0.24.0",
+        "email-validator>=2.0.0",
+        "python-dotenv>=1.0.0",
     ],
     extras_require={
         "dev": [

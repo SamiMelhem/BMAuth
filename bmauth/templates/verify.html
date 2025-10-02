@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register - BMAuth</title>
+    <title>Verify Email - BMAuth</title>
     <style>
         * {
             margin: 0;
@@ -28,8 +28,14 @@
         }
         h1 {
             color: #333;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
             text-align: center;
+        }
+        .info {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            color: #555;
+            font-size: 0.9rem;
         }
         .form-group {
             margin-bottom: 1.5rem;
@@ -48,6 +54,12 @@
             font-size: 1rem;
             transition: border-color 0.3s;
         }
+        input#pin {
+            text-align: center;
+            letter-spacing: 8px;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
         input:focus {
             outline: none;
             border-color: #667eea;
@@ -63,12 +75,16 @@
             font-weight: 600;
             cursor: pointer;
             transition: transform 0.2s;
+            margin-bottom: 0.5rem;
         }
         button:hover {
             transform: translateY(-2px);
         }
         button:active {
             transform: translateY(0);
+        }
+        button#resendBtn {
+            background: #6c757d;
         }
         .message {
             margin-top: 1rem;
@@ -101,120 +117,39 @@
 </head>
 <body>
     <div class="container">
-        <h1>Register</h1>
-        <form id="registerForm">
+        <h1>📧 Verify Email</h1>
+        <p class="info">Check your email for a 6-digit verification PIN</p>
+
+        <form id="verifyForm">
             <div class="form-group">
                 <label for="email">Email</label>
                 <input type="email" id="email" name="email" required>
             </div>
-            <button type="submit">Register with Biometrics</button>
+            <div class="form-group">
+                <label for="pin">Verification PIN</label>
+                <input type="text" id="pin" name="pin" maxlength="6" pattern="[0-9]{6}"
+                       placeholder="000000" required>
+            </div>
+            <button type="submit">Verify Email</button>
         </form>
 
-        <!-- Verification Section (hidden initially) -->
-        <div id="verifySection" style="display: none;">
-            <p style="text-align: center; margin-bottom: 1rem; color: #555;">
-                Check your email at <strong id="userEmail"></strong> for your verification PIN
-            </p>
-            <form id="verifyForm">
-                <div class="form-group">
-                    <label for="pin">Enter 6-Digit PIN</label>
-                    <input type="text" id="pin" name="pin" maxlength="6" pattern="[0-9]{6}" required
-                           style="text-align: center; letter-spacing: 4px; font-size: 1.5rem;"
-                           placeholder="000000">
-                </div>
-                <button type="submit">Verify Email</button>
-            </form>
-            <button id="resendBtn" type="button" style="background: #6c757d; margin-top: 0.5rem;">
-                Resend PIN
-            </button>
-        </div>
+        <button id="resendBtn" type="button">Resend PIN</button>
 
         <div id="message" class="message"></div>
+
         <div class="link">
-            <a href="/auth/login">Already registered? Login</a>
+            <a href="/auth/register">Back to Registration</a> |
+            <a href="/auth/login">Login</a>
         </div>
     </div>
 
     <script>
-        // Helper to convert base64url to Uint8Array
-        function base64urlToUint8Array(base64url) {
-            const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
-            const binary = atob(base64);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) {
-                bytes[i] = binary.charCodeAt(i);
-            }
-            return bytes;
+        // Get email from URL params if available
+        const urlParams = new URLSearchParams(window.location.search);
+        const emailParam = urlParams.get('email');
+        if (emailParam) {
+            document.getElementById('email').value = emailParam;
         }
-
-        // Helper to convert Uint8Array to base64url
-        function uint8ArrayToBase64url(array) {
-            const binary = String.fromCharCode(...array);
-            const base64 = btoa(binary);
-            return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-        }
-
-        document.getElementById('registerForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('email').value;
-            const messageDiv = document.getElementById('message');
-
-            try {
-                // Step 1: Request challenge from server
-                const beginResponse = await fetch('/auth/register/begin', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email })
-                });
-
-                if (!beginResponse.ok) throw new Error('Failed to begin registration');
-                const options = await beginResponse.json();
-
-                // Convert base64 strings to Uint8Array for WebAuthn
-                options.challenge = base64urlToUint8Array(options.challenge);
-                options.user.id = base64urlToUint8Array(options.user.id);
-
-                // Step 2: Create credential with biometrics
-                const credential = await navigator.credentials.create({
-                    publicKey: options
-                });
-
-                // Step 3: Send credential to server
-                const credentialData = {
-                    email,
-                    credential: {
-                        id: credential.id,
-                        rawId: uint8ArrayToBase64url(new Uint8Array(credential.rawId)),
-                        response: {
-                            clientDataJSON: uint8ArrayToBase64url(new Uint8Array(credential.response.clientDataJSON)),
-                            attestationObject: uint8ArrayToBase64url(new Uint8Array(credential.response.attestationObject))
-                        },
-                        type: credential.type
-                    }
-                };
-
-                const completeResponse = await fetch('/auth/register/complete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(credentialData)
-                });
-
-                if (!completeResponse.ok) throw new Error('Failed to complete registration');
-
-                const result = await completeResponse.json();
-
-                // Show PIN entry form
-                document.getElementById('registerForm').style.display = 'none';
-                document.querySelector('.link').style.display = 'none';
-                document.getElementById('verifySection').style.display = 'block';
-                document.getElementById('userEmail').textContent = email;
-
-            } catch (error) {
-                messageDiv.style.display = 'block';
-                messageDiv.className = 'message error';
-                messageDiv.textContent = `❌ Registration failed: ${error.message}`;
-            }
-        });
 
         // Handle PIN verification
         document.getElementById('verifyForm').addEventListener('submit', async (e) => {
@@ -238,7 +173,7 @@
 
                 messageDiv.style.display = 'block';
                 messageDiv.className = 'message success';
-                messageDiv.textContent = '✅ Email verified! Redirecting to login...';
+                messageDiv.textContent = '✅ Email verified successfully! Redirecting to login...';
 
                 setTimeout(() => {
                     window.location.href = '/auth/login';
@@ -255,6 +190,13 @@
         document.getElementById('resendBtn').addEventListener('click', async () => {
             const email = document.getElementById('email').value;
             const messageDiv = document.getElementById('message');
+
+            if (!email) {
+                messageDiv.style.display = 'block';
+                messageDiv.className = 'message error';
+                messageDiv.textContent = '❌ Please enter your email first';
+                return;
+            }
 
             try {
                 const response = await fetch('/auth/resend-pin', {
@@ -279,6 +221,11 @@
                 messageDiv.textContent = `❌ ${error.message}`;
             }
         });
+
+        // Auto-focus PIN field if email is pre-filled
+        if (emailParam) {
+            document.getElementById('pin').focus();
+        }
     </script>
 </body>
 </html>

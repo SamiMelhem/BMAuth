@@ -4,12 +4,20 @@ Test FastAPI app with BMAuth integration
 from fastapi import FastAPI
 from bmauth.auth import BMAuth
 import uvicorn
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Create FastAPI app
 app = FastAPI(title="BMAuth Test App")
 
-# Initialize BMAuth
-auth = BMAuth(app)
+auth = BMAuth(
+    app,
+    email_api_key=os.getenv("SENDGRID_API_KEY"),
+    from_email="SaMiLMelhem23@gmail.com"
+)
 
 # Your regular app routes
 @app.get("/")
