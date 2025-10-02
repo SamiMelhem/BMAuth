@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="bmauth",
-    version="0.0.2",
+    version="0.1.0",
     author="Sami Melhem",
     author_email="SaMiLMelhem23@gmail.com",
     description="Biometric Authentication System for FastAPI applications",
