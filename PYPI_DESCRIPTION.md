@@ -74,6 +74,19 @@ auth = BMAuth(
 - Python 3.8+
 - FastAPI
 - SendGrid account (for email verification)
+- Node.js 16+ (only required for the optional LocalTunnel dev helper)
+
+## Secure Cross-Device Testing (LocalTunnel)
+
+BMAuth includes a `bmauth-dev-tunnel` command that runs the demo FastAPI app on `127.0.0.1:8000`, exposes it via [LocalTunnel](https://github.com/localtunnel/localtunnel), and automatically configures the WebAuthn relying-party host. This gives you an HTTPS URL (trusted by public CAs) that your phone can use to exercise the QR-code device onboarding flow.
+
+```bash
+pip install -e .[dev]
+node --version   # ensure Node.js 16+
+bmauth-dev-tunnel
+```
+
+Use the printed local URL on your laptop and the public `https://*.loca.lt` URL on your mobile device. Stop the command with `Ctrl+C` once you are done testing.
 
 ## Documentation
 

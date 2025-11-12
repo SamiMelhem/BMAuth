@@ -136,6 +136,15 @@
     </div>
 
     <script>
+        // Ensure we're on localhost for WebAuthn when using insecure HTTP
+        (function enforceLocalhostForWebAuthn() {
+            const insecureHosts = new Set(['127.0.0.1', '0.0.0.0']);
+            if (!window.isSecureContext && insecureHosts.has(window.location.hostname)) {
+                const newUrl = window.location.href.replace(window.location.hostname, 'localhost');
+                window.location.replace(newUrl);
+            }
+        })();
+
         // Helper to convert base64url to Uint8Array
         function base64urlToUint8Array(base64url) {
             const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
@@ -175,9 +184,19 @@
                 options.user.id = base64urlToUint8Array(options.user.id);
 
                 // Step 2: Create credential with biometrics
-                const credential = await navigator.credentials.create({
-                    publicKey: options
-                });
+                let credential;
+                try {
+                    credential = await navigator.credentials.create({
+                        publicKey: options
+                    });
+                } catch (innerError) {
+                    console.error('WebAuthn create() failed:', innerError);
+                    let message = innerError && innerError.message ? innerError.message : String(innerError);
+                    if (message.includes('secure') || message.includes('insecure')) {
+                        message += ' (Make sure you are using https or http://localhost)';
+                    }
+                    throw new Error(message);
+                }
 
                 // Step 3: Send credential to server
                 const credentialData = {
@@ -210,6 +229,7 @@
                 document.getElementById('userEmail').textContent = email;
 
             } catch (error) {
+                console.error('Registration flow failed:', error);
                 messageDiv.style.display = 'block';
                 messageDiv.className = 'message error';
                 messageDiv.textContent = `❌ Registration failed: ${error.message}`;

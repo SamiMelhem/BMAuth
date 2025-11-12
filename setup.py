@@ -5,7 +5,7 @@ with open("PYPI_DESCRIPTION.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="bmauth",
-    version="0.1.0",
+    version="0.2.0",
     author="Sami Melhem",
     author_email="SaMiLMelhem23@gmail.com",
     description="Biometric Authentication System for FastAPI applications",
@@ -43,6 +43,12 @@ setup(
             "black>=22.0.0",
             "flake8>=4.0.0",
             "mypy>=0.950",
+            "uvicorn[standard]>=0.24.0",
+        ],
+    },
+    entry_points={
+        "console_scripts": [
+            "bmauth-dev-tunnel=bmauth.dev_tunnel:main",
         ],
     },
 )

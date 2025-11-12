@@ -57,3 +57,36 @@ auth = BMAuth(
 - Device B is verified (Creates a private key and sends public key to the server)
 - Device B is registered
 - User is prompted to de-authorize the lost Device A for security purposes
+
+
+## Local Development & Cross-Device Testing
+
+BMAuth ships with a helper command that spins up the demo FastAPI app and exposes it over HTTPS using [LocalTunnel](https://github.com/localtunnel/localtunnel). This lets a phone or tablet hit the same WebAuthn flow as your laptop without configuring certificates or paid tunnelling services.
+
+### Prerequisites
+- Python dev dependencies: `pip install -e .[dev]`
+- Node.js 16+ (ships with `npx`)
+- Optional (faster startup): `npm install -g localtunnel`
+
+### Start the tunnelled dev server
+
+```bash
+bmauth-dev-tunnel
+```
+
+The command:
+1. launches `uvicorn` on `http://127.0.0.1:8000`
+2. opens a LocalTunnel session and prints an `https://<random>.loca.lt` URL
+3. sets the WebAuthn relying-party host automatically so QR codes and login flows use the secure tunnel
+
+Point your desktop browser at the local URL and scan the printed public URL with your mobile device. When you stop the command (`Ctrl+C`), both the tunnel and the dev server shut down.
+
+You can customise the behaviour:
+
+```bash
+bmauth-dev-tunnel --app mypackage.main:app --port 9000 --subdomain mycustomname -- --reload
+```
+
+The flags after `--` are forwarded directly to `uvicorn`.
+
+If you prefer to run your own tunnel or reverse proxy, set `BMAUTH_HOST` before starting your app; the sample `tests/test_app.py` will use that value when constructing QR codes and WebAuthn challenges.

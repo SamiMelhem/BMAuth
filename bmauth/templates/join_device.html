@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Device - BMAuth</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 1.5rem;
+        }
+        #status {
+            padding: 1rem;
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+        }
+        #error {
+            padding: 1rem;
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+        }
+        .success-message {
+            background: #d4edda !important;
+            color: #155724 !important;
+            border: 1px solid #c3e6cb !important;
+        }
+        .link {
+            margin-top: 1rem;
+        }
+        .link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Add This Device</h1>
+        <div id="status">Requesting biometric authentication...</div>
+        <div id="error" style="display:none;"></div>
+    </div>
+
+    <script>
+        const sessionId = window.location.pathname.split('/').pop();
+
+        // Helper to convert base64url to Uint8Array
+        function base64ToBuffer(base64) {
+            const binary = atob(base64.replace(/-/g, '+').replace(/_/g, '/'));
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        // Helper to convert buffer to base64url
+        function bufferToBase64(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+
+        function credentialToJSON(credential) {
+            return {
+                id: credential.id,
+                rawId: bufferToBase64(credential.rawId),
+                type: credential.type,
+                response: {
+                    clientDataJSON: bufferToBase64(credential.response.clientDataJSON),
+                    attestationObject: bufferToBase64(credential.response.attestationObject),
+                    publicKey: credential.response.getPublicKey ?
+                        bufferToBase64(credential.response.getPublicKey()) : null
+                }
+            };
+        }
+
+        function showError(message) {
+            document.getElementById('error').textContent = message;
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('status').style.display = 'none';
+        }
+
+        window.onload = async () => {
+            try {
+                // Get WebAuthn challenge
+                const beginRes = await fetch(`/auth/device/join/begin/${sessionId}`, {
+                    method: 'POST'
+                });
+
+                if (!beginRes.ok) {
+                    const error = await beginRes.json();
+                    showError(error.error || 'Failed to get registration options');
+                    return;
+                }
+
+                const options = await beginRes.json();
+
+                if (options.error) {
+                    showError(options.error);
+                    return;
+                }
+
+                // Trigger biometric immediately
+                const credential = await navigator.credentials.create({
+                    publicKey: {
+                        challenge: base64ToBuffer(options.challenge),
+                        rp: options.rp,
+                        user: {
+                            id: base64ToBuffer(options.user.id),
+                            name: options.user.name,
+                            displayName: options.user.displayName
+                        },
+                        pubKeyCredParams: options.pubKeyCredParams,
+                        authenticatorSelection: options.authenticatorSelection,
+                        timeout: options.timeout,
+                        attestation: options.attestation
+                    }
+                });
+
+                // Send credential to server
+                const completeRes = await fetch('/auth/device/join/complete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        credential: credentialToJSON(credential)
+                    })
+                });
+
+                if (!completeRes.ok) {
+                    const error = await completeRes.json();
+                    showError(error.error || 'Failed to complete registration');
+                    return;
+                }
+
+                const result = await completeRes.json();
+
+                if (result.success) {
+                    document.getElementById('status').className = 'success-message';
+                    document.getElementById('status').innerHTML =
+                        `✅ ${result.device_name} added successfully!<br><div class="link"><a href="/auth/login">Go to Login</a></div>`;
+                } else {
+                    showError(result.error || 'Unknown error occurred');
+                }
+
+            } catch (error) {
+                showError('Biometric authentication failed: ' + error.message);
+            }
+        };
+    </script>
+</body>
+</html>
