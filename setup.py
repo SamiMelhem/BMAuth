@@ -5,7 +5,7 @@ with open("PYPI_DESCRIPTION.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="bmauth",
-    version="0.2.0",
+    version="0.3.0",
     author="Sami Melhem",
     author_email="SaMiLMelhem23@gmail.com",
     description="Biometric Authentication System for FastAPI applications",

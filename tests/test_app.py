@@ -1,58 +1,39 @@
 """
-Test FastAPI app with BMAuth integration + LocalTunnel for mobile testing
+Test FastAPI app with BMAuth integration
 """
+from os import getenv
+from dotenv import load_dotenv
+from uvicorn import run
 from fastapi import FastAPI
 from bmauth.auth import BMAuth
-import uvicorn
-import os
-import socket
-from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
-# def get_local_ip():
-#     try:
-#         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-#             s.connect(("8.8.8.8", 80))
-#             return s.getsockname()[0]
-#     except OSError:
-#         return "localhost"
-
 # Create FastAPI app
 app = FastAPI(title="BMAuth Test App")
 
-# Determine host for WebAuthn
-host_for_webauthn = os.getenv("BMAUTH_HOST", "localhost")
+# Configure Supabase storage (defaults to in-memory if omitted)
+# getenv() methods are what happens under the hood
+database_config = {
+    "provider": "supabase",
+    "url": getenv("SUPABASE_URL"), # REQUIRED
+    "key": getenv("SUPABASE_SERVICE_ROLE_KEY"), # REQUIRED
+    "postgres_dsn": getenv("SUPABASE_DB_URL"), # REQUIRED (creates auth tables), Optional after
+    "schema": getenv("SUPABASE_SCHEMA"), # Default: "public"
+    "table_prefix": getenv("SUPABASE_TABLE_PREFIX"), # Default: "bmauth_"
+    "auto_create_tables": True, # Optional: create auth tables automatically
+}
 
-if host_for_webauthn == "localhost":
-    desktop_url = "http://localhost:8000"
-    public_url = desktop_url
-else:
-    desktop_url = "http://127.0.0.1:8000"
-    public_url = f"https://{host_for_webauthn}"
-
-print("\n" + "=" * 60)
-print("🚀 BMAuth Test App")
-print("=" * 60)
-print(f"💻 Local Desktop URL: {desktop_url}")
-print(f"🌐 Public URL (shareable): {public_url}")
-print(f"🔗 WebAuthn RP ID Host: {host_for_webauthn}")
-print("=" * 60)
-print("\nTesting Instructions:")
-print("1. Desktop: Open the local URL in your browser")
-print("2. Register with Face ID/Windows Hello")
-print("3. Verify email with PIN")
-print("4. Login → QR code appears instantly")
-print("5. Phone: Scan QR with camera → Face ID prompt → Device added!")
-print("="*60 + "\n")
+host = getenv("BMAUTH_HOST", "localhost") # can specify a custom host
 
 # Initialize BMAuth
 auth = BMAuth(
     app,
-    host=host_for_webauthn,
-    email_api_key=os.getenv("SENDGRID_API_KEY"),
-    from_email="SaMiLMelhem23@gmail.com"
+    database=database_config,
+    host=host,
+    email_api_key=getenv("SENDGRID_API_KEY"),
+    from_email=getenv("SENDGRID_FROM_EMAIL", "noreply@domain.com"),
 )
 
 # Your regular app routes
@@ -64,9 +45,10 @@ async def root():
             "register": "/auth/register",
             "login": "/auth/login",
             "verify": "/auth/verify",
-            "status": "/auth/status"
+            "status": "/auth/status",
+            "debug_storage": "/auth/debug/storage",
         }
     }
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="localhost", port=8000)
+    run(app, host=host, port=8000)
